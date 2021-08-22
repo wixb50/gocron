@@ -143,11 +143,22 @@ export default {
         {
           value: 'postgres',
           label: 'PostgreSql'
+        },
+        {
+          value: 'sqlite3',
+          label: 'Sqlite3'
         }
       ],
       default_ports: {
         'mysql': 3306,
-        'postgres': 5432
+        'postgres': 5432,
+        'sqlite3': 1
+      },
+      default_username: {
+        'sqlite3': 'useless'
+      },
+      default_password: {
+        'sqlite3': 'useless'
       }
     }
   },
@@ -156,6 +167,8 @@ export default {
       console.log(dbType)
       console.log(this.default_ports[dbType])
       this.form['db_port'] = this.default_ports[dbType]
+      this.form['db_username'] = this.default_username[dbType]
+      this.form['db_password'] = this.default_password[dbType]
       console.log(this.form['db_port'])
     },
     submit () {

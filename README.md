@@ -80,7 +80,7 @@ docker run --name gocron --link mysql:db -p 5920:5920 -d ouqg/gocron
 
 ### 开发
 
-1. 安装Go1.9+, Node.js, Yarn
+1. 安装Go1.9+, Node.js v9, Yarn
 2. 安装前端依赖 `make install-vue`
 3. 启动gocron, gocron-node `make run`
 4. 启动node server `make run-vue`, 访问地址 http://localhost:8080

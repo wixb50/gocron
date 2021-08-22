@@ -11,6 +11,7 @@ import (
 	"github.com/go-xorm/core"
 	"github.com/go-xorm/xorm"
 	_ "github.com/lib/pq"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/ouqiang/gocron/internal/modules/app"
 	"github.com/ouqiang/gocron/internal/modules/logger"
 	"github.com/ouqiang/gocron/internal/modules/setting"
@@ -125,6 +126,8 @@ func getDbEngineDSN(setting *setting.Setting) string {
 			setting.Db.Host,
 			setting.Db.Port,
 			setting.Db.Database)
+	case "sqlite3":
+		dsn = setting.Db.Database
 	}
 
 	return dsn

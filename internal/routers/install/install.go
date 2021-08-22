@@ -20,7 +20,7 @@ import (
 // 系统安装
 
 type InstallForm struct {
-	DbType               string `binding:"In(mysql,postgres)"`
+	DbType               string `binding:"In(mysql,postgres,sqlite3)"`
 	DbHost               string `binding:"Required;MaxSize(50)"`
 	DbPort               int    `binding:"Required;Range(1,65535)"`
 	DbUsername           string `binding:"Required;MaxSize(50)"`
