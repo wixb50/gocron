@@ -158,7 +158,6 @@ func Store(ctx *macaron.Context, form TaskForm) string {
 			return json.CommonFailure("crontab表达式解析失败", err)
 		}
 	} else {
-		taskModel.DependencyTaskId = ""
 		taskModel.Spec = ""
 	}
 

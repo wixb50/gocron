@@ -1,19 +1,17 @@
 # gocron - 定时任务管理系统
-[![Downloads](https://img.shields.io/github/downloads/ouqiang/gocron/total.svg)](https://github.com/ouqiang/gocron/releases)
-[![license](https://img.shields.io/github/license/mashape/apistatus.svg?maxAge=2592000)](https://github.com/ouqiang/gocron/blob/master/LICENSE)
-[![Release](https://img.shields.io/github/release/ouqiang/gocron.svg?label=Release)](https://github.com/ouqiang/gocron/releases)
 
 # 项目简介
-使用Go语言开发的轻量级定时任务集中调度和管理系统, 用于替代Linux-crontab [查看文档](https://github.com/ouqiang/gocron/wiki)
 
-原有的延时任务拆分为独立项目[延迟队列](https://github.com/ouqiang/delay-queue)  
+> 感谢原项目[ouqiang/gocron](https://github.com/ouqiang/gocron)的支持。 
+
+使用Go语言开发的轻量级定时任务集中调度和管理系统, 用于替代Linux-crontab [查看文档](https://github.com/wixb50/gocron/wiki)
 
 ## 功能特性
 * Web界面管理定时任务
 * crontab时间表达式, 精确到秒
 * 任务执行失败可重试
 * 任务执行超时, 强制结束
-* 任务依赖配置, A任务完成后再执行B任务
+* 任务配置子任务, **DAG工作流支持**
 * 账户权限控制
 * 任务类型
     * shell任务
@@ -24,21 +22,21 @@
 * 任务执行结果通知, 支持邮件、Slack、Webhook
 
 ### 截图
-![流程图](https://raw.githubusercontent.com/ouqiang/gocron/master/assets/screenshot/scheduler.png)
-![任务](https://raw.githubusercontent.com/ouqiang/gocron/master/assets/screenshot/task.png)
-![Slack](https://raw.githubusercontent.com/ouqiang/gocron/master/assets/screenshot/notification.png)
+![流程图](https://raw.githubusercontent.com/wixb50/gocron/master/assets/screenshot/scheduler.png)
+![任务](https://raw.githubusercontent.com/wixb50/gocron/master/assets/screenshot/task.png)
+![Slack](https://raw.githubusercontent.com/wixb50/gocron/master/assets/screenshot/notification.png)
     
 ### 支持平台
 > Windows、Linux、Mac OS
 
 ### 环境要求
->  MySQL
+>  MySQL、Postgresql、Sqlite3
 
 
 ## 下载
-[releases](https://github.com/ouqiang/gocron/releases)  
+[releases](https://github.com/wixb50/gocron/releases)  
 
-[版本升级](https://github.com/ouqiang/gocron/wiki/版本升级)
+[版本升级](https://github.com/wixb50/gocron/wiki/版本升级)
 
 ## 安装
 
@@ -57,7 +55,7 @@
 ### 源码安装
 
 - 安装Go 1.11+
-- `go get -d github.com/ouqiang/gocron`
+- `go get -d github.com/wixb50/gocron`
 - `export GO111MODULE=on` 
 - 编译 `make`
 - 启动
@@ -68,7 +66,7 @@
 ### docker
 
 ```shell
-docker run --name gocron --link mysql:db -p 5920:5920 -d ouqg/gocron
+docker run --name gocron --link mysql:db -p 5920:5920 -d wixb50/gocron
 ```
 
 配置: /app/conf/app.ini
@@ -117,6 +115,7 @@ docker run --name gocron --link mysql:db -p 5920:5920 -d ouqg/gocron
     * -v 查看版本
 
 ## To Do List
+- [x] web节点高可用
 - [x] 版本升级
 - [x] 批量开启、关闭、删除任务
 - [x] 调度器与任务节点通信支持https
@@ -133,9 +132,14 @@ docker run --name gocron --link mysql:db -p 5920:5920 -d ouqg/gocron
 * RPC框架 [gRPC](https://github.com/grpc/grpc)
 
 ## 反馈
-提交[issue](https://github.com/ouqiang/gocron/issues/new)
+提交[issue](https://github.com/wixb50/gocron/issues/new)
 
 ## ChangeLog
+
+[v1.5.4]()
+--------
+* 支持Sqlite3
+* 任务依赖支持DAG工作流
 
 v1.5
 --------

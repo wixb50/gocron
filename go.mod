@@ -24,6 +24,7 @@ require (
 	github.com/mattn/go-sqlite3 v1.10.0 // indirect
 	github.com/ouqiang/goutil v1.1.1
 	github.com/rakyll/statik v0.1.6
+	github.com/silas/dag v0.0.0-20210626123444-3804bac2d6d4 // indirect
 	github.com/sirupsen/logrus v1.4.2
 	github.com/urfave/cli v1.20.0
 	golang.org/x/crypto v0.0.0-20190530122614-20be4c3c3ed5 // indirect

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ouqiang/goutil"
+	"github.com/silas/dag"
 
 	"github.com/jakecoffman/cron"
 	"github.com/ouqiang/gocron/internal/models"
@@ -316,35 +317,51 @@ func updateTaskLog(taskLogId int64, taskResult TaskResult) (int64, error) {
 
 }
 
-func createJob(taskModel models.Task) cron.FuncJob {
+// 图上任务节点运行
+func taskFunc(v dag.Vertex) dag.Diagnostics {
+	taskCount.Add()
+	defer taskCount.Done()
+	taskModel := *v.(*models.Task)
 	handler := createHandler(taskModel)
 	if handler == nil {
 		return nil
 	}
-	taskFunc := func() {
-		taskCount.Add()
-		defer taskCount.Done()
 
-		taskLogId := beforeExecJob(taskModel)
-		if taskLogId <= 0 {
-			return
-		}
-
-		if taskModel.Multi == 0 {
-			runInstance.add(taskModel.Id)
-			defer runInstance.done(taskModel.Id)
-		}
-
-		concurrencyQueue.Add()
-		defer concurrencyQueue.Done()
-
-		logger.Infof("开始执行任务#%s#命令-%s", taskModel.Name, taskModel.Command)
-		taskResult := execJob(handler, taskModel, taskLogId)
-		logger.Infof("任务完成#%s#命令-%s", taskModel.Name, taskModel.Command)
-		afterExecJob(taskModel, taskResult, taskLogId)
+	taskLogId := beforeExecJob(taskModel)
+	if taskLogId <= 0 {
+		return nil
 	}
 
-	return taskFunc
+	if taskModel.Multi == 0 {
+		runInstance.add(taskModel.Id)
+		defer runInstance.done(taskModel.Id)
+	}
+
+	concurrencyQueue.Add()
+	defer concurrencyQueue.Done()
+
+	logger.Infof("开始执行任务#%s#命令-%s", taskModel.Name, taskModel.Command)
+	taskResult := execJob(handler, taskModel, taskLogId)
+	logger.Infof("任务完成#%s#命令-%s", taskModel.Name, taskModel.Command)
+	afterExecJob(taskModel, taskResult, taskLogId)
+
+	var diags dag.Diagnostics
+	// 父子任务关系为强依赖, 父任务执行失败, 不执行依赖任务
+	if taskModel.DependencyStatus == models.TaskDependencyStatusStrong && taskResult.Err != nil {
+		logger.Infof("父子任务为强依赖关系, 父任务执行失败, 不运行依赖任务#父任务ID-%d", taskModel.Id)
+		diags = diags.Append(taskResult.Err)
+	}
+	return diags
+}
+
+// 构建有向无环图任务，不相关节点可以并行运行
+func createJob(taskModel models.Task) cron.FuncJob {
+	g := makeDependencyGraph(taskModel)
+	funcJob := func() {
+		g.Walk(taskFunc)
+	}
+
+	return funcJob
 }
 
 func createHandler(taskModel models.Task) Handler {
@@ -384,43 +401,52 @@ func afterExecJob(taskModel models.Task, taskResult TaskResult, taskLogId int64)
 
 	// 发送邮件
 	go SendNotification(taskModel, taskResult)
-	// 执行依赖任务
-	go execDependencyTask(taskModel, taskResult)
 }
 
-// 执行依赖任务, 多个任务并发执行
-func execDependencyTask(taskModel models.Task, taskResult TaskResult) {
+// 构建依赖任务, 多个任务并发执行
+func makeDependencyGraph(taskModel models.Task) dag.AcyclicGraph {
+	var g dag.AcyclicGraph
+	g.Add(&taskModel)
 	// 父任务才能执行子任务
 	if taskModel.Level != models.TaskLevelParent {
-		return
+		return g
 	}
 
-	// 是否存在子任务
-	dependencyTaskId := strings.TrimSpace(taskModel.DependencyTaskId)
-	if dependencyTaskId == "" {
-		return
+	// 生成依赖节点和边
+	var genDependency func(parent *models.Task)
+	genDependency = func(parent *models.Task) {
+		// 是否存在子任务
+		dependencyTaskId := strings.TrimSpace(parent.DependencyTaskId)
+		if dependencyTaskId == "" {
+			return
+		}
+
+		// 获取子任务
+		model := new(models.Task)
+		tasks, err := model.GetDependencyTaskList(dependencyTaskId)
+		if err != nil {
+			logger.Errorf("获取依赖任务失败#父任务ID-%d#%s", parent.Id, err.Error())
+			return
+		}
+		if len(tasks) == 0 {
+			logger.Errorf("依赖任务列表为空#父任务ID-%d", parent.Id)
+		}
+		for _, task := range tasks {
+			task.Spec = fmt.Sprintf("依赖任务(父任务ID-%d)", parent.Id)
+			g.Add(&task)
+			g.Connect(dag.BasicEdge(&task, parent))
+			genDependency(&task)
+		}
+	}
+	genDependency(&taskModel)
+	// 不合法有向无环图则只运行父节点
+	if err := g.Validate(); err != nil {
+		logger.Errorf("任务无法构建成合法有向无环图#主任务ID-%d", taskModel.Id)
+		g = dag.AcyclicGraph{}
+		g.Add(&taskModel)
 	}
 
-	// 父子任务关系为强依赖, 父任务执行失败, 不执行依赖任务
-	if taskModel.DependencyStatus == models.TaskDependencyStatusStrong && taskResult.Err != nil {
-		logger.Infof("父子任务为强依赖关系, 父任务执行失败, 不运行依赖任务#主任务ID-%d", taskModel.Id)
-		return
-	}
-
-	// 获取子任务
-	model := new(models.Task)
-	tasks, err := model.GetDependencyTaskList(dependencyTaskId)
-	if err != nil {
-		logger.Errorf("获取依赖任务失败#主任务ID-%d#%s", taskModel.Id, err.Error())
-		return
-	}
-	if len(tasks) == 0 {
-		logger.Errorf("依赖任务列表为空#主任务ID-%d", taskModel.Id)
-	}
-	for _, task := range tasks {
-		task.Spec = fmt.Sprintf("依赖任务(主任务ID-%d)", taskModel.Id)
-		ServiceTask.Run(task)
-	}
+	return g
 }
 
 // 发送任务结果通知
@@ -456,7 +482,7 @@ func SendNotification(taskModel models.Task, taskResult TaskResult) {
 		"output":           taskResult.Result,
 		"status":           statusName,
 		"task_id":          taskModel.Id,
-		"remark":  			taskModel.Remark,
+		"remark":           taskModel.Remark,
 	}
 	notify.Push(msg)
 }

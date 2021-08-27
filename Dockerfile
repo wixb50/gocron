@@ -14,7 +14,7 @@ RUN git clone https://github.com/ouqiang/gocron.git \
     && make install-vue \
     && make build-vue \
     && make statik \
-    && CGO_ENABLED=0 make gocron
+    && CGO_ENABLED=1 make gocron
 
 FROM alpine:3.12
 
