@@ -83,7 +83,10 @@
               {{scope.row.created | formatTime}} <br>
             </el-form-item>
             <el-form-item label="任务类型:">
-              {{scope.row.level | formatLevel}} <br>
+              {{scope.row.level | formatLevel}}
+              <span v-if="scope.row.dependency_task_id !== ''">
+                ({{scope.row.dependency_status | formatDependencyStatus}}#子任务ID-{{scope.row.dependency_task_id}})
+              </span> <br>
             </el-form-item>
             <el-form-item label="单实例运行:">
                {{scope.row.multi | formatMulti}} <br>
@@ -243,6 +246,12 @@ export default {
         return '主任务'
       }
       return '子任务'
+    },
+    formatDependencyStatus (value) {
+      if (value === 1) {
+        return '强依赖'
+      }
+      return '弱依赖'
     },
     formatTimeout (value) {
       if (value > 0) {

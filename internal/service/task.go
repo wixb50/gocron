@@ -414,6 +414,7 @@ func makeDependencyGraph(taskModel models.Task) dag.AcyclicGraph {
 
 	// 生成依赖节点和边
 	var genDependency func(parent *models.Task)
+	allNodes := make(map[int]*models.Task)
 	genDependency = func(parent *models.Task) {
 		// 是否存在子任务
 		dependencyTaskId := strings.TrimSpace(parent.DependencyTaskId)
@@ -432,10 +433,21 @@ func makeDependencyGraph(taskModel models.Task) dag.AcyclicGraph {
 			logger.Errorf("依赖任务列表为空#父任务ID-%d", parent.Id)
 		}
 		for _, task := range tasks {
-			task.Spec = fmt.Sprintf("依赖任务(父任务ID-%d)", parent.Id)
-			g.Add(&task)
-			g.Connect(dag.BasicEdge(&task, parent))
-			genDependency(&task)
+			task := task // 重新赋值，更改其地址
+			node, ok := allNodes[task.Id]
+			if !ok {
+				node = &task
+				node.Spec = fmt.Sprintf("依赖任务#父任务ID-(%d)", parent.Id)
+				allNodes[task.Id] = node
+				g.Add(node)
+			} else {
+				spec := fmt.Sprintf("(%d)", parent.Id)
+				if !strings.Contains(node.Spec, spec) {
+					node.Spec += spec
+				}
+			}
+			g.Connect(dag.BasicEdge(node, parent))
+			genDependency(node)
 		}
 	}
 	genDependency(&taskModel)
