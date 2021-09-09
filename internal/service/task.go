@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"math/rand"
 	"net/http"
 	"strconv"
 	"strings"
@@ -248,8 +249,15 @@ func (h *RPCHandler) Run(taskModel models.Task, taskUniqueId int64) (result stri
 	taskRequest.Timeout = int32(taskModel.Timeout)
 	taskRequest.Command = taskModel.Command
 	taskRequest.Id = taskUniqueId
-	resultChan := make(chan TaskResult, len(taskModel.Hosts))
-	for _, taskHost := range taskModel.Hosts {
+	// 多hosts选择运行
+	runHost := taskModel.Hosts
+	if taskModel.HttpMethod == 2 {
+		// 随机运行
+		ri := rand.Intn(len(runHost))
+		runHost = taskModel.Hosts[ri : ri+1]
+	}
+	resultChan := make(chan TaskResult, len(runHost))
+	for _, taskHost := range runHost {
 		go func(th models.TaskHostDetail) {
 			output, err := rpcClient.Exec(th.Name, th.Port, taskRequest)
 			errorMessage := ""
@@ -265,7 +273,7 @@ func (h *RPCHandler) Run(taskModel models.Task, taskUniqueId int64) (result stri
 
 	var aggregationErr error = nil
 	aggregationResult := ""
-	for i := 0; i < len(taskModel.Hosts); i++ {
+	for i := 0; i < len(runHost); i++ {
 		taskResult := <-resultChan
 		aggregationResult += taskResult.Result
 		if taskResult.Err != nil {

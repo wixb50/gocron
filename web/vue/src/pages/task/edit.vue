@@ -72,7 +72,7 @@
           </el-col>
         </el-row>
         <el-row>
-          <el-col :span="8">
+          <el-col :span="7">
             <el-form-item label="执行方式">
               <el-select v-model.trim="form.protocol">
                 <el-option
@@ -84,7 +84,7 @@
               </el-select>
             </el-form-item>
           </el-col>
-          <el-col :span="8" v-if="form.protocol === 1 ">
+          <el-col :span="7" v-if="form.protocol === 1 ">
             <el-form-item label="请求方法">
               <el-select key="http-method" v-model.trim="form.http_method">
                 <el-option
@@ -96,7 +96,7 @@
               </el-select>
             </el-form-item>
           </el-col>
-          <el-col :span="8" v-else>
+          <el-col :span="7" v-else>
             <el-form-item label="任务节点">
               <el-select key="shell" v-model="selectedHosts" filterable multiple placeholder="请选择">
                 <el-option
@@ -104,6 +104,18 @@
                   :key="item.id"
                   :label="item.alias + ' - ' + item.name"
                   :value="item.id">
+                </el-option>
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="7" v-if="form.protocol === 2 ">
+            <el-form-item label="调度策略">
+              <el-select key="host-method" v-model.trim="form.http_method">
+                <el-option
+                  v-for="item in hostMethods"
+                  :key="item.value"
+                  :label="item.label"
+                  :value="item.value">
                 </el-option>
               </el-select>
             </el-form-item>
@@ -315,6 +327,16 @@ export default {
         {
           value: 2,
           label: 'post'
+        }
+      ],
+      hostMethods: [
+        {
+          value: 1,
+          label: '全部运行'
+        },
+        {
+          value: 2,
+          label: '随机选择'
         }
       ],
       protocolList: [
