@@ -141,6 +141,7 @@ docker run --name gocron --link mysql:db -p 5920:5920 -d wixb50/gocron
 * 支持Sqlite3数据库
 * 任务依赖支持DAG工作流
 * 支持shell任务调度策略
+* 支持失败任务继续运行
 
 v1.5
 --------

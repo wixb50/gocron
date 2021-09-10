@@ -307,6 +307,29 @@ func createTaskLog(taskModel models.Task, status models.Status) (int64, error) {
 	return insertId, err
 }
 
+// 查询最新任务日志并初始化
+func uselastTaskLog(taskModel models.Task, offsetId int64) int64 {
+	taskLogModel := new(models.TaskLog)
+	var insertId int64 = -1
+	taskLogs, _ := taskLogModel.List(models.CommonMap{"TaskId": taskModel.Id})
+	for _, item := range taskLogs {
+		if item.Id >= offsetId {
+			if item.Status == models.Failure {
+				insertId = item.Id
+				taskLogModel.Update(insertId, models.CommonMap{
+					"spec":   taskModel.Spec,
+					"status": models.Running,
+				})
+			} else {
+				insertId = 0 // 成功则跳过
+			}
+			break
+		}
+	}
+
+	return insertId
+}
+
 // 更新任务日志
 func updateTaskLog(taskLogId int64, taskResult TaskResult) (int64, error) {
 	taskLogModel := new(models.TaskLog)
@@ -390,6 +413,16 @@ func beforeExecJob(taskModel models.Task) (taskLogId int64) {
 		createTaskLog(taskModel, models.Cancel)
 		return
 	}
+	// 继续运行
+	if strings.Contains(taskModel.Spec, "继续运行") {
+		offsetId, _ := strconv.ParseInt(strings.Split(taskModel.Spec, "#")[1], 10, 64) // 基准日志ID
+		logger.Debugf("继续运行-%s", taskModel.Command)
+		taskLogId := uselastTaskLog(taskModel, offsetId)
+		if taskLogId >= 0 {
+			return taskLogId
+		}
+	}
+	// 重新运行
 	taskLogId, err := createTaskLog(taskModel, models.Running)
 	if err != nil {
 		logger.Error("任务开始执行#写入任务日志失败-", err)
@@ -421,6 +454,7 @@ func makeDependencyGraph(taskModel models.Task) dag.AcyclicGraph {
 	}
 
 	// 生成依赖节点和边
+	specPrefix := taskModel.Spec
 	var genDependency func(parent *models.Task)
 	allNodes := make(map[int]*models.Task)
 	genDependency = func(parent *models.Task) {
@@ -445,7 +479,7 @@ func makeDependencyGraph(taskModel models.Task) dag.AcyclicGraph {
 			node, ok := allNodes[task.Id]
 			if !ok {
 				node = &task
-				node.Spec = fmt.Sprintf("依赖任务#父任务ID-(%d)", parent.Id)
+				node.Spec = fmt.Sprintf("%s#父任务ID-(%d)", specPrefix, parent.Id)
 				allNodes[task.Id] = node
 				g.Add(node)
 			} else {

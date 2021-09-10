@@ -3,6 +3,8 @@ package tasklog
 // 任务日志
 
 import (
+	"fmt"
+
 	"github.com/ouqiang/gocron/internal/models"
 	"github.com/ouqiang/gocron/internal/modules/logger"
 	"github.com/ouqiang/gocron/internal/modules/utils"
@@ -64,6 +66,23 @@ func Stop(ctx *macaron.Context) string {
 	}
 
 	return json.Success("已执行停止操作, 请等待任务退出", nil)
+}
+
+// 继续运行失败的任务
+func Continue(ctx *macaron.Context) string {
+	id := ctx.QueryInt64("id")
+	taskId := ctx.QueryInt("task_id")
+	json := utils.JsonResponse{}
+	taskModel := new(models.Task)
+	task, err := taskModel.Detail(taskId)
+	if err != nil || task.Id <= 0 {
+		return json.CommonFailure("获取任务详情失败", err)
+	}
+
+	task.Spec = fmt.Sprintf("继续运行#%d", id) // 复用Spec字段传递运行方式
+	service.ServiceTask.Run(task)
+
+	return json.Success("任务已开始运行, 请到原有日志中查看结果", nil)
 }
 
 // 删除N个月前的日志

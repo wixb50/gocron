@@ -11,5 +11,9 @@ export default {
 
   stop (id, taskId, callback) {
     httpClient.post('/task/log/stop', {id, task_id: taskId}, callback)
+  },
+
+  continue (id, taskId, callback) {
+    httpClient.post('/task/log/continue', {id, task_id: taskId}, callback)
   }
 }

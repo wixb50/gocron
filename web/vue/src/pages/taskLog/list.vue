@@ -111,7 +111,7 @@
         </el-table-column>
         <el-table-column
           label="执行结果"
-          width="120" v-if="this.isAdmin">
+          width="220" v-if="this.isAdmin">
           <template slot-scope="scope">
             <el-button type="success"
                        v-if="scope.row.status === 2"
@@ -122,6 +122,9 @@
             <el-button type="danger"
                        v-if="scope.row.status === 1 && scope.row.protocol === 2"
                        @click="stopTask(scope.row)">停止任务
+            </el-button>
+            <el-button type="primary"
+                      @click="continueTask(scope.row)">继续
             </el-button>
           </template>
         </el-table-column>
@@ -247,6 +250,14 @@ export default {
       taskLogService.stop(item.id, item.task_id, () => {
         this.search()
       })
+    },
+    continueTask (item) {
+      this.$appConfirm(() => {
+        taskLogService.continue(item.id, item.task_id, () => {
+          this.$message.success('失败任务已继续执行')
+          this.search()
+        })
+      }, true)
     },
     showTaskResult (item) {
       this.dialogVisible = true
