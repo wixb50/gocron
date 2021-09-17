@@ -65,7 +65,7 @@ const (
 func (setting *Setting) InitBasicField() {
 	setting.Code = MasterCode
 	setting.Key = ""
-	setting.Value = ""
+	setting.Value = MasterCode
 	Db.Insert(setting)
 	setting.Id = 0
 

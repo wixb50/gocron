@@ -203,6 +203,7 @@ func (task Task) WaitAndExit() {
 	}
 	serviceCron.Stop()
 	taskCount.Exit()
+	serviceCron = nil
 }
 
 // 直接运行任务
