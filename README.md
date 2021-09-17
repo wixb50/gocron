@@ -136,6 +136,10 @@ docker run --name gocron --link mysql:db -p 5920:5920 -d wixb50/gocron
 
 ## ChangeLog
 
+[v1.5.5]()
+--------
+* 支持web多点主从高可用
+
 [v1.5.4]()
 --------
 * 支持Sqlite3数据库

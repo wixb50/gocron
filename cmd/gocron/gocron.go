@@ -4,9 +4,15 @@
 package main
 
 import (
+	"context"
+	"fmt"
+	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	macaron "gopkg.in/macaron.v1"
 
@@ -59,6 +65,11 @@ func getCommands() []cli.Command {
 				Usage: "bind port",
 			},
 			cli.StringFlag{
+				Name:  "address",
+				Value: fmt.Sprintf("127.0.0.1:%d", DefaultPort),
+				Usage: "bind address",
+			},
+			cli.StringFlag{
 				Name:  "env,e",
 				Value: "prod",
 				Usage: "runtime environment, dev|test|prod",
@@ -74,8 +85,53 @@ func runWeb(ctx *cli.Context) {
 	setEnvironment(ctx)
 	// 初始化应用
 	app.InitEnv(AppVersion)
+	// 初始化http服务
+	host := parseHost(ctx)
+	port := parsePort(ctx)
+	maddress := ctx.String("address")
+	srv := &http.Server{
+		Addr: fmt.Sprintf("%s:%d", host, port),
+	}
+	// 选择运行的角色
+	master := models.Setting{}
+	master.NewMaster(maddress)
+	initModule(false)
+	// 主节点5s一次心跳，从节点20s一次
+	retry := 0
+	for {
+		time.Sleep(time.Duration(retry) * time.Second)
+		if !app.Installed {
+			if retry == 0 {
+				srv = runMaster(ctx, srv)
+				retry = 5
+				logger.Infof("主节点#请先安装#-%s", master.Key)
+			}
+			continue
+		}
+		if ok, address := master.TryMaster(); ok {
+			if retry != 5 {
+				srv = runMaster(ctx, srv)
+				retry = 5
+				logger.Infof("主节点#选举成功#-%s", address)
+			}
+			logger.Infof("主节点#发送心跳#-%s-%s", master.Key, master.Value)
+		} else {
+			if retry != 20 || maddress != address {
+				srv = runProxy(ctx, srv, address)
+				maddress = address
+				retry = 20
+				logger.Infof("从节点#切换成功#-%s", address)
+			}
+			logger.Infof("从节点#请求转发#-%s-%s", master.Key, address)
+		}
+	}
+}
+
+func runMaster(ctx *cli.Context, lsrv *http.Server) *http.Server {
+	lsrv.Shutdown(context.Background())
+	service.ServiceTask.WaitAndExit()
 	// 初始化模块 DB、定时任务等
-	initModule()
+	initModule(true)
 	// 捕捉信号,配置热更新等
 	go catchSignal()
 	m := macaron.Classic()
@@ -83,30 +139,56 @@ func runWeb(ctx *cli.Context) {
 	routers.Register(m)
 	// 注册中间件.
 	routers.RegisterMiddleware(m)
-	host := parseHost(ctx)
-	port := parsePort(ctx)
-	m.Run(host, port)
+	mux := http.NewServeMux()
+	mux.Handle("/", m)
+	srv := &http.Server{
+		Addr:    lsrv.Addr,
+		Handler: mux,
+	}
+	go srv.ListenAndServe()
+	return srv
 }
 
-func initModule() {
+func runProxy(ctx *cli.Context, lsrv *http.Server, address string) *http.Server {
+	lsrv.Shutdown(context.Background())
+	service.ServiceTask.WaitAndExit()
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
+		target, _ := url.Parse(fmt.Sprintf("http://%s", address))
+		proxy := httputil.NewSingleHostReverseProxy(target)
+		proxy.ServeHTTP(w, req)
+	})
+	srv := &http.Server{
+		Addr:    lsrv.Addr,
+		Handler: mux,
+	}
+	go srv.ListenAndServe()
+	return srv
+}
+
+func initModule(withTask bool) {
 	if !app.Installed {
 		return
 	}
 
-	config, err := setting.Read(app.AppConfig)
-	if err != nil {
-		logger.Fatal("读取应用配置失败", err)
+	if app.Setting == nil {
+		config, err := setting.Read(app.AppConfig)
+		if err != nil {
+			logger.Fatal("读取应用配置失败", err)
+		}
+		app.Setting = config
+
+		// 初始化DB
+		models.Db = models.CreateDb()
+
+		// 版本升级
+		upgradeIfNeed()
 	}
-	app.Setting = config
 
-	// 初始化DB
-	models.Db = models.CreateDb()
-
-	// 版本升级
-	upgradeIfNeed()
-
-	// 初始化定时任务
-	service.ServiceTask.Initialize()
+	if withTask {
+		// 初始化定时任务
+		service.ServiceTask.Initialize()
+	}
 }
 
 // 解析端口

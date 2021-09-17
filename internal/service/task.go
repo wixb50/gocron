@@ -198,6 +198,9 @@ func (task Task) Remove(id int) {
 
 // 等待所有任务结束后退出
 func (task Task) WaitAndExit() {
+	if serviceCron == nil {
+		return
+	}
 	serviceCron.Stop()
 	taskCount.Exit()
 }

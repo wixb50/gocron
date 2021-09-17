@@ -2,6 +2,8 @@ package models
 
 import (
 	"encoding/json"
+	"strconv"
+	"time"
 )
 
 type Setting struct {
@@ -36,6 +38,10 @@ const webhookTemplate = `
 `
 
 const (
+	MasterCode = "master"
+)
+
+const (
 	SlackCode        = "slack"
 	SlackUrlKey      = "url"
 	SlackTemplateKey = "template"
@@ -57,6 +63,12 @@ const (
 
 // 初始化基本字段 邮件、slack等
 func (setting *Setting) InitBasicField() {
+	setting.Code = MasterCode
+	setting.Key = ""
+	setting.Value = ""
+	Db.Insert(setting)
+	setting.Id = 0
+
 	setting.Code = SlackCode
 	setting.Key = SlackUrlKey
 	setting.Value = ""
@@ -91,6 +103,27 @@ func (setting *Setting) InitBasicField() {
 	setting.Key = WebhookUrlKey
 	setting.Value = ""
 	Db.Insert(setting)
+}
+
+func (setting *Setting) NewMaster(address string) {
+	setting.Code = MasterCode
+	setting.Key = address
+	setting.Value = address
+}
+
+func (setting *Setting) TryMaster() (bool, string) {
+	lastMaster := Setting{Code: MasterCode, Value: setting.Value}
+	setting.Value = strconv.FormatInt(time.Now().Unix(), 10)
+	affected, _ := Db.Update(setting, lastMaster)
+	if affected >= 1 {
+		return true, setting.Key
+	} else {
+		// 获取最新主节点地址和更新时间
+		lastMaster.Value = ""
+		Db.Get(&lastMaster)
+		setting.Value = lastMaster.Value
+		return false, lastMaster.Key
+	}
 }
 
 // region slack配置
